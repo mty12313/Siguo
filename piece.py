@@ -1,34 +1,29 @@
-PIECE_RANKS = {
-    "Flag": -1, #军棋
-    "Mine": 0, #地雷
-    "Bomb": 1, #炸弹 
-    "Engineer": 32, #工兵
-    "PlatoonLeader": 33, #排长
-    "CompanyLeader": 34, #连长
-    "BattalionLeader": 35, #营长
-    "RegimentLeader": 36, #团长
-    "Brigadier": 37, #旅长
-    "DivisionCommander": 38, #师长
-    "CorpsCommander": 39, #军长
-    "General": 40 #司令
+# Mapping of piece names to their rank values (lower rank = weaker, except for special rules)
+# Special pieces have fixed behavior:
+# - Flag: immobile and must be captured to win
+# - Mine: cannot move, only defeated by Engineer
+# - Bomb: defeats any piece but also dies
+# - Engineer: can defuse Mines
+from constants import PIECE_RANKS, MAX_COUNTS
+import itertools
+_type_counters: dict[str, itertools.count] = {}
+
+name_map = {
+    "旗": "Flag",
+    "雷": "Mine",
+    "炸": "Bomb",
+    "兵": "Engineer",
+    "排": "PlatoonLeader",
+    "连": "CompanyLeader",
+    "营": "BattalionLeader",
+    "团": "RegimentLeader",
+    "旅": "Brigadier",
+    "师": "DivisionCommander",
+    "军": "CorpsCommander",
+    "司": "General",
 }
 
-
-#标准棋子数量
-MAX_COUNTS = {
-    "Mine": 3,               # 地雷
-    "Flag": 1,               # 军旗
-    "Bomb": 2,               # 炸弹
-    "Engineer": 3,           # 工兵
-    "PlatoonLeader": 3,      # 排长
-    "CompanyLeader": 3,      # 连长
-    "BattalionLeader": 2,    # 营长
-    "RegimentLeader": 2,     # 团长
-    "Brigadier": 2,          # 旅长
-    "DivisionCommander": 2,  # 师长
-    "CorpsCommander": 1,     # 军长
-    "General": 1             # 司令
-}
+EN2CN = {v: k for k, v in name_map.items()}
 
 class Piece:
     name: str
@@ -39,34 +34,50 @@ class Piece:
     movable: bool
 
     def __init__(self, name, rank, owner, movable=True):
-        self.name = name
+        self.name = name 
         self.rank = rank
         self.owner = owner
-        self.revealed = True
-        self.alive = True
-        self.movable = movable
-        self.movable = name not in ("Mine", "Flag")
+        self.revealed = True #If the piece can be seen
+        self.alive = True   #If the piece is alive
+        self.movable = movable  #If the piece is movable
+        self.movable = name not in ("Mine", "Flag") #Flag and Mine can't be moved
 
+        #用来查看棋子的类型 可视化
+        if name not in _type_counters:
+            _type_counters[name] = itertools.count(1)
+        # 拿到中文简称（如果没有对应，就退回英文前两个字母）
+        short = EN2CN.get(name, name[:2])
+        # 拼成中文+编号，例如“师1”、“师2”
+        self.uid = f"{short}{next(_type_counters[name])}"
+
+    # Return a string representation of the piece for debugging and display.
     def __repr__(self):
         status = "alive" if self.alive else "dead"
         return f"{self.owner} {self.name} ({status})"
 
+    # Mark this piece as revealed
     def reveal(self):
         self.revealed = True
 
+    # Mark this piece as no longer alive
     def kill(self):
         self.alive = False
 
+    #Determine whether this piece can defeat the other piece in battle
     def can_defeat(self, other: 'Piece') -> bool: 
+        #Dead piece can't be attack or attack others
         if not self.alive or not other.alive:
             return False 
         
+        # The bomb kills itself and every piece it encounters
         if self.rank == 1 or other.rank == 1:
-            return True  # The bomb kills itself and every piece it encounters
+            return True  
 
+        #Mines can only be killed by Engineer except the bomb
         if other.rank == 0:
-            return self.rank == 32 #Mines can only be killed by Engineer
+            return self.rank == 32 
 
+        #According to the rank
         if self.rank > other.rank:
             other.kill()
             return True
@@ -74,7 +85,7 @@ class Piece:
             self.kill()
             return False
         else:
-            # 等级相同：同归于尽
+            # If the rank is the same. Kill both
             self.kill()
             other.kill()
             return False

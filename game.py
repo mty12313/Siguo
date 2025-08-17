@@ -1,59 +1,28 @@
+# game.py - Pre-Battle Setup and In-Game Interaction Logic for Four Kingdoms Military Chess
+
+# This module defines the Game class, which handles all piece placement,
+# initialization, and player interaction before and during the game.
+
 import pygame
 from chessboard import ChessBoard
-from piece import Piece, PIECE_RANKS, MAX_COUNTS
+from piece import Piece
+from constants import (
+    PIECE_RANKS,
+    MAX_COUNTS,
+    camp_positions,
+    COLOR_ZONES,
+    OWNER_TO_COLOR,
+    ALLOWED_MINE_CELLS,
+    FORBIDDEN_BOMB_CELLS,
+    ALLOWED_FLAG_CELLS,
+)
 import random
 
-# 每个格子的像素大小，用于计算弹窗位置
+# Pixel size of each grid cell, used for GUI placement and popup alignment
 GRID_SIZE = 40
 
-#自动判读棋子初始区域
-COLOR_ZONES = {
-    "Red":    (6, 11, 10, 16),
-    "Green":  (6, 0, 10, 5),
-    "Blue":   (0, 6, 5, 10),
-    "Yellow": (11, 6, 16, 10),
-}
-
-OWNER_TO_COLOR = {
-    "Red":    (255, 0, 0),
-    "Green":  (0, 200, 0),
-    "Blue":   (0, 100, 255),
-    "Yellow": (200, 200, 0),
-}
-
-#地雷允许区域
-ALLOWED_MINE_CELLS = {
-    (row, col)
-    for row in range(17)
-    for col in range(17)
-    if row in (0, 1, 15, 16) or col in (0, 1, 15, 16)
-}
-
-#炸弹非法区域
-FORBIDDEN_BOMB_CELLS = {
-    (row, col)
-    for row in range(17)
-    for col in range(17)
-    if row in (5, 11) or col in (5, 11)
-}
-
-#军棋只能防止这些区域
-ALLOWED_FLAG_CELLS = {
-    (0, 7), (7, 0), (0, 9), (9, 0),
-    (16, 7), (7, 16), (16, 9), (9, 16)
-}
-
-#行营位置
-CAMPS_CELLS = {
-    (2, 7), (4, 7), (14, 7), (12, 7),
-    (2, 9), (4, 9), (14, 9), (12, 9),
-    (3, 8), (13, 8),
-    (7, 2), (7, 4), (7, 12), (7, 14),
-    (9, 2), (9, 4), (9, 12), (9, 14),
-    (8, 3), (8, 13)
-}
-
-#判断区域
+# Determine which color zone (Red/Green/Blue/Yellow) a grid cell belongs to
+# Used to assign ownership when placing pieces
 def get_zone_color(row: int, col: int) -> str | None:
     for color, (x1, y1, x2, y2) in COLOR_ZONES.items():
         if x1 <= col <= x2 and y1 <= row <= y2:
@@ -62,9 +31,6 @@ def get_zone_color(row: int, col: int) -> str | None:
     
 
 class Game:
-    """Core game logic (no GUI). Handles selection, movement, piece state,
-    and renders a right-click info overlay within pygame."""
-
     GRID_ROWS = 17
     GRID_COLS = 17
 
@@ -72,7 +38,6 @@ class Game:
         # 游戏状态
         self.board = ChessBoard()
         self.selected: tuple[int, int] | None = None  # (row, col)
-
         # 弹窗菜单数据和位置
         self.info_items: list[dict] | None = None
         self.info_pos: tuple[int, int] | None = None  # 像素坐标 (x, y)
@@ -170,17 +135,8 @@ class Game:
             return False
 
     def on_right_click(self, row: int, col: int) -> None:
-        # 允许弹菜单的位置集合（坐标已调换为 (row, col)）
-        allowed = {
-            (2, 7), (4, 7), (14, 7), (12, 7),
-            (2, 9), (4, 9), (14, 9), (12, 9),
-            (3, 8), (13, 8),
-            (7, 2), (7, 4), (7, 12), (7, 14),
-            (9, 2), (9, 4), (9, 12), (9, 14),
-            (8, 3), (8, 13)
-        }
         # 非法位置不弹菜单
-        if (row, col) in allowed:
+        if (row, col) in camp_positions:
             return
 
         # 当前玩家颜色，比如 "Red"/"Blue"
@@ -381,7 +337,7 @@ class Game:
                 for r in range(y1, y2+1)
                 for c in range(x1, x2+1)
                 if self.board.is_valid_cell(c, r)
-                and (r, c) not in CAMPS_CELLS
+                and (r, c) not in camp_positions
             ]
             random.shuffle(free_cells)
 
@@ -421,3 +377,57 @@ class Game:
                     p.revealed = True
                     self.board.place_piece(c, r, p)
                     free_cells.remove((r, c))
+    
+    def generate_random_setup_red_green(self):
+        """只为 Red 和 Green 两方随机布阵"""
+        # 1. 清空原有
+        self.board.grid = [[None] * self.GRID_COLS for _ in range(self.GRID_ROWS)]
+        self.clear_overlay()
+
+        # 2. 遍历 Red/Green 两个阵营
+        for owner, zone in COLOR_ZONES.items():
+            if owner not in ("Red", "Green"):
+                continue
+            x1, y1, x2, y2 = zone
+
+            # 收集该区所有合法空格
+            free_cells = [
+                (r, c)
+                for r in range(y1, y2 + 1)
+                for c in range(x1, x2 + 1)
+                if self.board.is_valid_cell(c, r)
+                   and (r, c) not in camp_positions
+            ]
+            random.shuffle(free_cells)
+
+            # 3. 放 Flag → Mine → Bomb
+            for piece_type in ("Flag", "Mine", "Bomb"):
+                need = MAX_COUNTS[piece_type]
+                if piece_type == "Flag":
+                    candidates = [cell for cell in free_cells if cell in ALLOWED_FLAG_CELLS]
+                elif piece_type == "Mine":
+                    candidates = [cell for cell in free_cells if cell in ALLOWED_MINE_CELLS]
+                else:
+                    candidates = [cell for cell in free_cells if cell not in FORBIDDEN_BOMB_CELLS]
+
+                picks = random.sample(candidates, need)
+                for r, c in picks:
+                    p = Piece(piece_type, PIECE_RANKS[piece_type], owner)
+                    p.alive = True; p.revealed = True
+                    self.board.place_piece(c, r, p)
+                    free_cells.remove((r, c))
+
+            # 4. 放剩余普通棋子
+            for piece_type, need in MAX_COUNTS.items():
+                if piece_type in ("Flag", "Mine", "Bomb"):
+                    continue
+                picks = random.sample(free_cells, need)
+                for r, c in picks:
+                    p = Piece(piece_type, PIECE_RANKS[piece_type], owner)
+                    p.alive = True; p.revealed = True
+                    self.board.place_piece(c, r, p)
+                    free_cells.remove((r, c))
+
+        # 5. 红方先手，禁用编辑
+        self.current_turn_index = 0
+        self.edit_mode = False

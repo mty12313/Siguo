@@ -128,6 +128,7 @@ def main() -> None:
                     elif button["label"] == "红绿开始":
                         # 初始化红绿双人模式并直接进入对战
                         state_manager = two_player_mode
+                        game.belief_sampler.initialize(game.board)
                         game.board.set_alliance_map({
                             "Red":   1,
                             "Green": 2,
@@ -159,15 +160,27 @@ def main() -> None:
                         print("不是你的回合！")
                         continue
                 if not _is_obstacle_cell(row, col):
-                    if not _is_obstacle_cell(row, col):
-                        moved = game.on_left_click(row, col)   # 现在它会返回 True/False
-                        if moved and state_manager.is_playing:
-                            mover = state_manager.current_player()  
-                            hidden = game.board.get_all_hidden_positions(my_side=mover)
-                            print(f"\n>>> {mover} 走完后的隐藏敌方棋子：")
-                            for x, y in hidden:
-                                p = game.get_piece(x, y)
-                                print(f"  位置 {(x, y)} {p.uid} owner={p.owner} revealed={p.revealed}")
+                    moved = game.on_left_click(row, col)   # 现在它会返回 True/False
+                    if moved and state_manager.is_playing:
+                        mover = state_manager.current_player()
+                        hidden = game.board.get_all_hidden_positions(my_side=mover)
+
+                        # 1. 打印隐藏位置
+                        print(f"\n>>> {mover} 走完后的隐藏敌方棋子：")
+                        for x, y in hidden:
+                            p = game.get_piece(x, y)
+                            print(f"  位置 {(x, y)} {p.uid} owner={p.owner} revealed={p.revealed}")
+
+                        # 2. 打印 belief sampler 中的 legal 分布
+                        print(f"\n>>> {mover} 隐藏位置上的合法棋子类型分布（legal distribution）：")
+                        bs = game.belief_sampler  # 你的 belief sampler 对象
+                        for pos in hidden:
+                            dist = bs.beliefs[pos]  # {piece_type: probability}
+                            # 按概率从高到低排序输出
+                            sorted_dist = sorted(dist.items(), key=lambda kv: kv[1], reverse=True)
+                            probs_str = ", ".join(f"{ptype}: {prob:.2f}" for ptype, prob in sorted_dist)
+                            print(f"  位置 {pos} -> {probs_str}")
+
                             
                             state_manager.next_turn()             # 真正走子后切轮次
             # --------------- 再处理右键弹窗 ---------------

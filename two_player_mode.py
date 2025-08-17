@@ -4,12 +4,15 @@
 # handles player turns, determines piece mobility, and automatically performs
 # elimination and victory checks during gameplay.
 
-from constants import ALLIANCE
+ALLIANCE = {
+    "Red": 1,
+    "Green": 2,
+}
 
 # Color order for turn rotation
-COLORS = ['Red', 'Yellow', 'Green', 'Blue']
+COLORS = ['Red', 'Green']
 
-class GameState:
+class TwoPlayer:
     #Initialize the game state.
     def __init__(self):
         self.is_playing = False
@@ -209,4 +212,4 @@ class GameState:
 
                 p.movable = movable
 
-game_state = GameState()
+two_player_mode = TwoPlayer()
