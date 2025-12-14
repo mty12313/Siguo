@@ -2,7 +2,6 @@ from routes import is_connected_by, LineType
 from chessboard import ChessBoard
 
 def main():
-    # 手动测试连通性
     chessboard = ChessBoard()
     x1, y1 = 16, 7
     x2, y2 = 16, 8

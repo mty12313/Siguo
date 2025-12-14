@@ -42,12 +42,9 @@ class Piece:
         self.movable = movable  #If the piece is movable
         self.movable = name not in ("Mine", "Flag") #Flag and Mine can't be moved
 
-        #用来查看棋子的类型 可视化
         if name not in _type_counters:
             _type_counters[name] = itertools.count(1)
-        # 拿到中文简称（如果没有对应，就退回英文前两个字母）
         short = EN2CN.get(name, name[:2])
-        # 拼成中文+编号，例如“师1”、“师2”
         self.uid = f"{short}{next(_type_counters[name])}"
 
     # Return a string representation of the piece for debugging and display.

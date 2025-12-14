@@ -33,7 +33,6 @@ class ChessBoard:
         self.alliance_map = DEFAULT_ALLIANCE.copy()
     
     def set_alliance_map(self, new_map: dict[str,int]):
-        """模式切换时调用，传入想要的 owner->阵营  映射"""
         self.alliance_map = new_map
 
     # Some of the cell is invalid
@@ -313,16 +312,10 @@ class ChessBoard:
         limit = MAX_COUNTS.get(piece_type, 0)
         return count < limit
     
-    #显示每一步的隐藏棋子
     def get_all_hidden_positions(self, my_side) -> List[Tuple[int, int]]:
-        """
-        返回所有敌方尚未揭示的棋子的位置列表。
-        my_side: 我方 owner（如 "Red"）
-        """
         hidden: List[Tuple[int, int]] = []
         for y, row in enumerate(self.grid):
             for x, piece in enumerate(row):
-                # 用 owner 而不是 color 判断阵营
                 if piece is not None and piece.owner != my_side:
                     hidden.append((x, y))
         return hidden
